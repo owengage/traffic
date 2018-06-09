@@ -115,7 +115,7 @@ function render_body(ctx, vehicle) {
 function render_guideline(ctx, from_point, to_point) {
         ctx.save();
         ctx.beginPath();
-        ctx.setLineDash([3, 1]);
+        ctx.setLineDash([3, 3]);
         ctx.moveTo(from_point.x, from_point.y);
         ctx.lineTo(to_point.x, to_point.y);
         ctx.strokeStyle = 'red';
@@ -147,32 +147,35 @@ function calc_intersection_point(eq1, eq2) {
     };
 }
 
-function render_turning(ctx, vehicle) {
+function add_points(p1, p2) {
+    return {
+        x: p1.x + p2.x,
+        y: p1.y + p2.y,
+    }
+}
+
+function sub_points(p1, p2) {
+    return {
+        x: p1.x - p2.x,
+        y: p1.y - p2.y,
+    }
+}
+
+function distance_between_points(p1, p2) {
+    const d = sub_points(p1, p2);
+    return Math.sqrt(d.x * d.x + d.y * d.y);
+}
+
+function as_guideline(ctx, fn) {
+    ctx.save();
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = 'red';
+    fn();
+    ctx.restore();
+}
+
+function get_turning_circle(vehicle) {
     const centre = vehicle.centre;
-    const radius = 20;
-    for (const wheel of vehicle.wheels) {
-        const abs_centre = {
-            x: centre.x + wheel.centre.x,
-            y: centre.y + wheel.centre.y
-        };
-
-        const line_angle = Math.PI/2 - wheel.angle;
-        const dx = radius * Math.sin(line_angle);
-        const dy = radius * Math.cos(line_angle);
-
-        const from_point= rotate_point({
-            x: abs_centre.x - dx,
-            y: abs_centre.y - dy, 
-        }, centre, vehicle.angle);
-
-        const to_point = rotate_point({
-            x: abs_centre.x + 3*dx,
-            y: abs_centre.y + 3*dy,
-        }, centre, vehicle.angle);
-        
-        render_guideline(ctx, from_point, to_point);
-    } 
-
     const eqs = vehicle.wheels.map(wheel => {
         const abs_centre = {
             x: centre.x + wheel.centre.x,
@@ -182,8 +185,46 @@ function render_turning(ctx, vehicle) {
         return eq_from_angle_and_point(line_angle, abs_centre); 
     });
 
-    const int_point = rotate_point(calc_intersection_point(eqs[0], eqs[1]), centre, vehicle.angle);
-    ctx.fillRect(int_point.x, int_point.y, 5,5);
+    const int_point = calc_intersection_point(eqs[0], eqs[1])
+    const first_wheel = vehicle.wheels[0];
+    const wheel_centre = add_points(centre, first_wheel.centre);
+    const turning_radius = distance_between_points(wheel_centre, int_point);
+
+    if (turning_radius == Infinity) {
+        return { radius: turning_radius, point: null };
+    }    
+
+    const rotated_int = rotate_point(int_point, centre, vehicle.angle);
+    return {
+        point: rotated_int,
+        radius: turning_radius,
+        clockwise: vehicle.wheels[0].angle > 0
+    }
+}
+
+function render_turning(ctx, vehicle) {
+    const centre = vehicle.centre;
+    const { point: rotated_int, radius: turning_radius } = get_turning_circle(vehicle);
+
+    if (!rotated_int) {
+        // Going straight.
+        return;
+    }
+
+    as_guideline(ctx, () => {
+        ctx.beginPath();
+        ctx.arc(rotated_int.x, rotated_int.y, turning_radius, 0, 2 * Math.PI);
+        ctx.stroke();        
+    });
+
+    // Guidelines
+    const radius = 20;
+    for (const wheel of vehicle.wheels) {
+        const abs_centre = add_points(centre, wheel.centre);
+        const from_point = rotate_point(abs_centre, centre, vehicle.angle);
+        render_guideline(ctx, from_point, rotated_int);
+    } 
+
 }
 
 function render(ctx, vehicle) {
@@ -192,23 +233,64 @@ function render(ctx, vehicle) {
     render_turning(ctx, vehicle);
 }
 
+function normalise_angle(angle) {
+    angle = angle % (2 * Math.PI); // Now between -2pi and +2pi
+    if (angle < 0) {
+        // 0 and 2pi
+        angle = 2 * Math.PI + angle;
+    }
+        
+    return angle; // -pi to +pi;
+}
+
+function move(vehicle, distance) {
+    const { radius, point, clockwise } = get_turning_circle(vehicle);
+    let angle_delta = distance / radius;
+    angle_delta = clockwise ? angle_delta : -angle_delta;
+ 
+    if (!point) {
+        vehicle.centre = add_points(vehicle.centre, {
+            x: distance * Math.sin(vehicle.angle),
+            y: -distance * Math.cos(vehicle.angle),
+        });
+        return;
+    }
+
+    vehicle.centre = rotate_point(vehicle.centre, point, angle_delta);
+    vehicle.angle = normalise_angle(vehicle.angle + angle_delta);
+}
+
+/**
+ * todo:
+ *  - Push vehicle!
+ *  - Animate!
+ *  - Figure 8!
+ * bug:
+ *  - Wheel rotation of 90deg doesn't produce correct turning circle.
+ *
+ */
+
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('landscape');
     const ctx = canvas.getContext('2d');
     outline_canvas(ctx, canvas);
 
-    const bike1 = make_bike(100, 400);
-    bike1.angle = Math.PI * 1.4;
-    render(ctx, bike1);
+    const bike = make_bike(400, 400);
+    bike.wheels[0].angle = -0.7;
+    move(bike, 10);
+    render(ctx, bike);
 
-    const bike2 = make_bike(200, 200);
-    render(ctx, bike2);
-
-//    const bike3 = make_bike(300, 300);
-//    bike3.wheels[0].angle = 0;
-//    render(ctx, bike3);
+//    setTimeout(() => {
+    let t = 0;
+    setInterval(() => {
+        bike.wheels[0].angle = 1.1 * Math.sin(t/15);
+        move(bike, 10);
+        ctx.clearRect(0,0,canvas.width, canvas.height);
+        render(ctx, bike);
+        t++;
+    }, 1000/50);
 
     setTimeout(() => {
-//        location.reload(true);
+        //location.reload(true);
     }, 1000);
 });
