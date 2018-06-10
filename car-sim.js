@@ -1,8 +1,3 @@
-function outline_canvas(ctx, canvas) {
-    ctx.rect(1,1,canvas.width-2,canvas.height-2);
-    ctx.stroke();
-}
-
 function make_wheel(x, y, options={}) {
     options = {
         width: options.width || 15,
@@ -16,12 +11,28 @@ function make_wheel(x, y, options={}) {
     };
 }
 
+function clamp(value, min, max) {
+    if (value > max) return max;
+    if (value < min) return min;
+    return value;
+}
+
 function make_bike(x, y) {
     const length = 70;
     const width = 20;
+    const turn_limit = 1;
+
     return {
-        centre: { x, y },
+        turn(angle) {
+            const current = this.wheels[0].angle;
+            this.wheels[0].angle = clamp(current + angle, -turn_limit, turn_limit);
+        },
+        accelerate(speed_delta) {
+            this.speed += speed_delta;
+        },
         angle: 0,
+        speed: 0,
+        centre: { x, y },
         body: { length, width },
         wheels: [ 
             make_wheel(0, -length/2, { width: 10, angle: 0.5 }), 
@@ -87,7 +98,7 @@ function render_wheels(ctx, vehicle) {
         const poly = rectangle(
             abs_centre,
             wheel.width,
-            wheel.length, 0);
+            wheel.length);
 
         return rotate_poly(poly, abs_centre, wheel.angle);
     });
@@ -105,7 +116,7 @@ function render_wheels(ctx, vehicle) {
 function render_body(ctx, vehicle) {
     const centre = vehicle.centre;
     const body = vehicle.body;
-    const poly = rectangle(centre, body.width, body.length, 0);
+    const poly = rectangle(centre, body.width, body.length);
     const rotated = rotate_poly(poly, centre, vehicle.angle);
 
     trace_poly(ctx, rotated);
@@ -113,14 +124,12 @@ function render_body(ctx, vehicle) {
 }
 
 function render_guideline(ctx, from_point, to_point) {
-        ctx.save();
+    as_guideline(ctx, () => {
         ctx.beginPath();
-        ctx.setLineDash([3, 3]);
         ctx.moveTo(from_point.x, from_point.y);
         ctx.lineTo(to_point.x, to_point.y);
-        ctx.strokeStyle = 'red';
         ctx.stroke();        
-        ctx.restore();
+    });
 }
 
 function calc_line_eq(p1, p2) {
@@ -228,9 +237,12 @@ function render_turning(ctx, vehicle) {
 }
 
 function render(ctx, vehicle) {
+    ctx.save();
+    ctx.scale(0.5, 0.5);
     render_wheels(ctx, vehicle);
     render_body(ctx, vehicle);
     render_turning(ctx, vehicle);
+    ctx.restore();
 }
 
 function normalise_angle(angle) {
@@ -243,8 +255,9 @@ function normalise_angle(angle) {
     return angle; // -pi to +pi;
 }
 
-function move(vehicle, distance) {
+function move(vehicle) {
     const { radius, point, clockwise } = get_turning_circle(vehicle);
+    const distance = vehicle.speed;
     let angle_delta = distance / radius;
     angle_delta = clockwise ? angle_delta : -angle_delta;
  
@@ -260,6 +273,34 @@ function move(vehicle, distance) {
     vehicle.angle = normalise_angle(vehicle.angle + angle_delta);
 }
 
+function attach_controller(vehicle) {
+    const key_left = 37;
+    const key_right = 39;
+    const key_up = 38;
+    const key_down = 40;
+
+    console.log('Attaching controller');
+    function on_keypress(event) {
+        console.log('Key pressed!', event);
+
+        switch (event.keyCode) {
+        case key_left:
+            vehicle.turn(-0.1);
+            break;
+        case key_right:
+            vehicle.turn(0.1);
+            break; 
+        case key_up:
+            vehicle.accelerate(1);
+            break;
+        case key_down:
+            vehicle.accelerate(-1);
+            break;
+        }
+    }
+    document.addEventListener('keypress', on_keypress);
+}
+
 /**
  * todo:
  *  - Push vehicle!
@@ -273,24 +314,25 @@ function move(vehicle, distance) {
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('landscape');
     const ctx = canvas.getContext('2d');
-    outline_canvas(ctx, canvas);
 
-    const bike = make_bike(400, 400);
-    bike.wheels[0].angle = -0.7;
-    move(bike, 10);
-    render(ctx, bike);
+    const bike = make_bike(800, 800);
+    const bike2 = make_bike(500, 800);
+    const render_interval = 1000/50;
+    const simulation_interval = 20;
 
-//    setTimeout(() => {
-    let t = 0;
+    bike2.wheels[0].angle = 0.2;
+    bike2.speed = 10; 
+
+    attach_controller(bike);
+
     setInterval(() => {
-        bike.wheels[0].angle = 1.1 * Math.sin(t/15);
-        move(bike, 10);
         ctx.clearRect(0,0,canvas.width, canvas.height);
         render(ctx, bike);
-        t++;
-    }, 1000/50);
+        render(ctx, bike2);
+    }, render_interval);
 
-    setTimeout(() => {
-        //location.reload(true);
-    }, 1000);
+    setInterval(() => {
+        move(bike);
+        move(bike2);
+    }, simulation_interval);
 });
