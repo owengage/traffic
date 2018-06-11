@@ -1,53 +1,6 @@
-class Point {
-    constructor(x, y) {
-        this.x = x;
-        this.y = y;
-    }
-    
-    add(p) {
-        return new Point(p.x + this.x, p.y + this.y);
-    } 
-
-    sub(p) {
-        return new Point(this.x - p.x, this.y - p.y);
-    }
-
-    rot(angle, centre) {
-        const delta = this.sub(centre);
-
-        const rotated_delta = new Point(
-            delta.x * Math.cos(angle) - delta.y * Math.sin(angle),
-            delta.y * Math.cos(angle) + delta.x * Math.sin(angle));
-
-        return rotated_delta.add(centre);
-    }
-
-    scalar_mult(scale) {
-        return new Point(this.x * scale, this.y * scale);
-    }
-
-    negate() {
-        return new Point(-this.x, -this.y);
-    }
-}
-
-class Polygon {
-    constructor(points) {
-        this.points = points;
-    }
-    
-    rot(angle, centre) {
-        return new Polygon(this.points.map(point => point.rot(angle, centre)));
-    }
-
-    trans(point) {
-        return new Polygon(this.points.map(p => p.add(point)));
-    }
-
-    scalar_mult(scale) {
-        return new Polygon(this.points.map(p => p.scalar_mult(scale)));
-    }
-}
+import Point from './point';
+import Polygon from './polygon';
+import Renderer from './renderer';
 
 function clamp(value, min, max) {
     if (value > max) return max;
@@ -120,15 +73,6 @@ function make_car(x, y) {
     }
 }
 
-function trace_poly(ctx, poly) {
-    ctx.beginPath();
-    ctx.moveTo(poly.points[0].x, poly.points[0].y);
-    for (point of poly.points) {
-        ctx.lineTo(point.x, point.y);
-    }
-    ctx.closePath();
-}
-
 function make_rectangle(centre, width, length, angle) {
     const top = centre.y - length / 2; 
     const left = centre.x - width / 2;
@@ -176,15 +120,6 @@ function render_body(renderer, vehicle) {
     renderer.stroke_polygon(black_brush, rotated);
 }
 
-function render_guideline(ctx, from_point, to_point) {
-    as_guideline(ctx, () => {
-        ctx.beginPath();
-        ctx.moveTo(from_point.x, from_point.y);
-        ctx.lineTo(to_point.x, to_point.y);
-        ctx.stroke();        
-    });
-}
-
 function calc_line_eq(p1, p2) {
     const gradient = (p2.y - p1.y) / (p2.x - p1.x);
     return {
@@ -211,14 +146,6 @@ function calc_intersection_point(eq1, eq2) {
 function distance_between_points(p1, p2) {
     const d = p1.sub(p2);
     return Math.sqrt(d.x * d.x + d.y * d.y);
-}
-
-function as_guideline(ctx, fn) {
-    ctx.save();
-    ctx.setLineDash([3, 3]);
-    ctx.strokeStyle = 'red';
-    fn();
-    ctx.restore();
 }
 
 function get_turning_circle(vehicle) {
@@ -276,7 +203,6 @@ function render_turning(renderer, vehicle) {
     renderer.stroke_arc(guideline_brush, rotated_int, turning_radius);
 
     // Guidelines
-    const radius = 20;
     for (const wheel of vehicle.wheels) {
         const abs_centre = centre.add(wheel.centre);
         const from_point = abs_centre.rot(vehicle.angle, centre);
@@ -285,46 +211,7 @@ function render_turning(renderer, vehicle) {
 
 }
 
-should_draw_guidelines = true;
-
-class Renderer {
-    constructor(ctx, centre, scale) {
-        this.ctx = ctx;
-        this.centre = centre; // TODO: not really centre. It's top-left.
-        this.scale = scale;
-    }
-
-    stroke_polygon(brush, poly) {
-        poly = poly
-            .trans(this.centre.negate())
-            .scalar_mult(this.scale);
-        
-        this._with_brush(brush, () => {
-            trace_poly(this.ctx, poly);
-            this.ctx.stroke();
-        });
-    }
-
-    stroke_arc(brush, centre, radius, start=0, end=2*Math.PI) {
-        centre = centre
-            .add(this.centre.negate())
-            .scalar_mult(this.scale);
-        radius *= this.scale;
-
-        this._with_brush(brush, () => {
-            this.ctx.beginPath();
-            this.ctx.arc(centre.x, centre.y, radius, start, end);
-            this.ctx.stroke();        
-        });
-    }
-
-    _with_brush(brush, fn) {
-        this.ctx.save();
-        brush.activate(this.ctx);
-        fn();
-        this.ctx.restore();
-    }
-}
+let should_draw_guidelines = true;
 
 function render_vehicle(renderer, vehicle) {
     render_wheels(renderer, vehicle);
@@ -342,7 +229,7 @@ function normalise_angle(angle) {
         angle = 2 * Math.PI + angle;
     }
         
-    return angle; // -pi to +pi;
+    return angle;
 }
 
 function move(vehicle) {
