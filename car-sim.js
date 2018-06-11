@@ -21,6 +21,14 @@ class Point {
 
         return rotated_delta.add(centre);
     }
+
+    scalar_mult(scale) {
+        return new Point(this.x * scale, this.y * scale);
+    }
+
+    negate() {
+        return new Point(-this.x, -this.y);
+    }
 }
 
 class Polygon {
@@ -30,6 +38,14 @@ class Polygon {
     
     rot(angle, centre) {
         return new Polygon(this.points.map(point => point.rot(angle, centre)));
+    }
+
+    trans(point) {
+        return new Polygon(this.points.map(p => p.add(point)));
+    }
+
+    scalar_mult(scale) {
+        return new Polygon(this.points.map(p => p.scalar_mult(scale)));
     }
 }
 
@@ -127,7 +143,7 @@ function make_rectangle(centre, width, length, angle) {
     ]);
 }
 
-function render_wheels(ctx, vehicle) {
+function render_wheels(renderer, vehicle) {
     const centre = vehicle.centre;
 
     // Get polygons as if vehicle is straight.
@@ -147,19 +163,17 @@ function render_wheels(ctx, vehicle) {
 
     // Draw.
     for (const wheel of wheel_polys) {
-        trace_poly(ctx, wheel);
-        ctx.stroke();
+        renderer.stroke_polygon(black_brush, wheel);
     }
 }
 
-function render_body(ctx, vehicle) {
+function render_body(renderer, vehicle) {
     const centre = vehicle.centre;
     const body = vehicle.body;
     const poly = make_rectangle(centre, body.width, body.length);
     const rotated = poly.rot(vehicle.angle, centre);
 
-    trace_poly(ctx, rotated);
-    ctx.stroke();
+    renderer.stroke_polygon(black_brush, rotated);
 }
 
 function render_guideline(ctx, from_point, to_point) {
@@ -194,15 +208,8 @@ function calc_intersection_point(eq1, eq2) {
         eq1.gradient * x_int + eq1.constant);
 }
 
-function sub_points(p1, p2) {
-    return {
-        x: p1.x - p2.x,
-        y: p1.y - p2.y,
-    }
-}
-
 function distance_between_points(p1, p2) {
-    const d = sub_points(p1, p2);
+    const d = p1.sub(p2);
     return Math.sqrt(d.x * d.x + d.y * d.y);
 }
 
@@ -243,41 +250,88 @@ function get_turning_circle(vehicle) {
     }
 }
 
-function render_turning(ctx, vehicle) {
+const black_brush = {
+    activate(ctx) {}
+}
+
+const guideline_brush = {
+    activate(ctx) {
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = 'red';
+    }
+};
+
+function render_turning(renderer, vehicle) {
     const centre = vehicle.centre;
     const { point: rotated_int, radius: turning_radius } = get_turning_circle(vehicle);
 
     if (!rotated_int) {
-        render_guideline(ctx, 
+        renderer.stroke_polygon(guideline_brush, new Polygon([
             centre.add(vehicle.wheels[0].centre).rot(vehicle.angle, centre), 
-            centre.add(vehicle.wheels[1].centre).rot(vehicle.angle, centre));
+            centre.add(vehicle.wheels[1].centre).rot(vehicle.angle, centre)
+        ]));
         return;
     }
 
-    as_guideline(ctx, () => {
-        ctx.beginPath();
-        ctx.arc(rotated_int.x, rotated_int.y, turning_radius, 0, 2 * Math.PI);
-        ctx.stroke();        
-    });
+    renderer.stroke_arc(guideline_brush, rotated_int, turning_radius);
 
     // Guidelines
     const radius = 20;
     for (const wheel of vehicle.wheels) {
         const abs_centre = centre.add(wheel.centre);
         const from_point = abs_centre.rot(vehicle.angle, centre);
-        render_guideline(ctx, from_point, rotated_int);
+        renderer.stroke_polygon(guideline_brush, new Polygon([ from_point, rotated_int ]));
     } 
 
 }
 
 should_draw_guidelines = true;
 
-function render(ctx, vehicle) {
-    render_wheels(ctx, vehicle);
-    render_body(ctx, vehicle);
+class Renderer {
+    constructor(ctx, centre, scale) {
+        this.ctx = ctx;
+        this.centre = centre; // TODO: not really centre. It's top-left.
+        this.scale = scale;
+    }
+
+    stroke_polygon(brush, poly) {
+        poly = poly
+            .trans(this.centre.negate())
+            .scalar_mult(this.scale);
+        
+        this._with_brush(brush, () => {
+            trace_poly(this.ctx, poly);
+            this.ctx.stroke();
+        });
+    }
+
+    stroke_arc(brush, centre, radius, start=0, end=2*Math.PI) {
+        centre = centre
+            .add(this.centre.negate())
+            .scalar_mult(this.scale);
+        radius *= this.scale;
+
+        this._with_brush(brush, () => {
+            this.ctx.beginPath();
+            this.ctx.arc(centre.x, centre.y, radius, start, end);
+            this.ctx.stroke();        
+        });
+    }
+
+    _with_brush(brush, fn) {
+        this.ctx.save();
+        brush.activate(this.ctx);
+        fn();
+        this.ctx.restore();
+    }
+}
+
+function render_vehicle(renderer, vehicle) {
+    render_wheels(renderer, vehicle);
+    render_body(renderer, vehicle);
 
     if (should_draw_guidelines) {
-        render_turning(ctx, vehicle);
+        render_turning(renderer, vehicle);
     }
 }
 
@@ -338,6 +392,27 @@ function attach_controller(vehicle) {
     document.addEventListener('keypress', on_keypress);
 }
 
+/**
+ * Currently just a storage place for stuff in the world.
+ */
+class World {
+    constructor() {
+        this.vehicles = [];
+    }
+
+    add_vehicle(vehicle) {
+        this.vehicles.push(vehicle);
+    }
+}
+
+function render_view(ctx, world, centre, scale) {
+    const renderer = new Renderer(ctx, centre, scale);
+
+    for (const v of world.vehicles) {
+        render_vehicle(renderer, v, centre, scale);
+    } 
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('landscape');
     const ctx = canvas.getContext('2d');
@@ -355,10 +430,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     attach_controller(bike);
 
+    const world = new World();
+    world.add_vehicle(bike);
+    world.add_vehicle(car);
+    
+
     setInterval(() => {
         ctx.clearRect(0,0,canvas.width, canvas.height);
-        render(ctx, bike);
-        render(ctx, car);
+        render_view(ctx, world, new Point(-100, 200), 0.3);
     }, render_interval);
 
     setInterval(() => {
@@ -366,5 +445,5 @@ document.addEventListener('DOMContentLoaded', () => {
         move(car);
     }, simulation_interval);
 
-    //setTimeout(() => { location.reload(true)}, 1000);
+//    setTimeout(() => { location.reload(true)}, 1000);
 });
