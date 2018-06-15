@@ -48,6 +48,18 @@ export default class Renderer {
             this.ctx.stroke();        
         });
     }
+    
+    stroke_path(brush, points) {
+        this._with_brush(brush, () => {
+            this.ctx.moveTo(points[0].x, points[0].y);
+            this.ctx.beginPath();
+            for (let p of points) {
+                p = p.add(this.centre.negate()).scalar_mult(this.scale);
+                this.ctx.lineTo(p.x, p.y);
+            }
+            this.ctx.stroke();
+        });
+    }
 
     _with_brush(brush, fn) {
         this.ctx.save();

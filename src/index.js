@@ -57,6 +57,11 @@ function make_car(x, y) {
             this.wheels[0].angle = new_angle;
             this.wheels[3].angle = new_angle; 
         },
+        turn_to(angle) {
+            angle = normalise_angle(angle);
+            this.wheels[0].angle = angle;
+            this.wheels[3].angle = angle; 
+        },
         accelerate(speed_delta) {
             this.speed += speed_delta;
         },
@@ -235,13 +240,13 @@ function render_vehicle(renderer, vehicle) {
 }
 
 function normalise_angle(angle) {
-    angle = angle % (2 * Math.PI); // Now between -2pi and +2pi
-    if (angle < 0) {
-        // 0 and 2pi
-        angle = 2 * Math.PI + angle;
-    }
-        
-    return angle;
+    const min = -Math.PI; // Minimum allowed normalised value.
+    const max = Math.PI; // Max allowed.
+
+    // Many thanks: https://stackoverflow.com/questions/1628386
+    const width = max - min;
+    const offset = angle - min;
+    return (offset - (Math.floor(offset / width) * width)) + min;
 }
 
 function move(vehicle) {
@@ -250,6 +255,9 @@ function move(vehicle) {
     let angle_delta = distance / radius;
     angle_delta = clockwise ? angle_delta : -angle_delta;
  
+    console.debug('a', angle_delta);
+    console.debug('v', vehicle.angle + angle_delta);
+    console.debug('norm', normalise_angle(vehicle.angle + angle_delta));
     if (!point) {
         vehicle.centre = vehicle.centre.add(new Point(
             distance * Math.sin(vehicle.angle),
@@ -261,13 +269,70 @@ function move(vehicle) {
     vehicle.angle = normalise_angle(vehicle.angle + angle_delta);
 }
 
-function attach_controller(vehicle) {
-    const key_left = 37;
-    const key_right = 39;
-    const key_up = 38;
-    const key_down = 40;
-    const key_d = 68;
+function get_desired_absolute_wheel_angle(distance) {
+    const distance_for_perpendicular_wheel = 400;
+    const half_pi = Math.PI / 2;
 
+    if (distance > distance_for_perpendicular_wheel) {
+        return +half_pi;
+    }
+
+    if (-distance > distance_for_perpendicular_wheel) {
+        return -half_pi;
+    }
+    return half_pi * Math.sin(half_pi * distance / distance_for_perpendicular_wheel);
+}
+
+function move_towards_segment(vehicle, segment) {
+    function get_distance_from_segment(vehicle, segment) {
+        const { x: x0, y: y0 } = vehicle.centre;
+        const { x: x1, y: y1 } = segment.start;
+        const { x: x2, y: y2 } = segment.end;
+     
+        const numerator = (y2 - y1)*x0 - (x2 - x1)*y0 + x2*y1 - y2*x1;
+        const denominator = distance_between_points(segment.start, segment.end);
+        return numerator/denominator;
+    }
+
+    const distance = get_distance_from_segment(vehicle, segment);
+    const absolute_angle = get_desired_absolute_wheel_angle(distance);
+    vehicle.turn_to(absolute_angle - vehicle.angle);
+    move(vehicle);
+}
+
+const key_left = 37;
+const key_right = 39;
+const key_up = 38;
+const key_down = 40;
+
+
+function attach_view_controller(renderer) {
+    function on_keypress(event) {
+        switch (event.keyCode) {
+            case key_left:
+                renderer.centre = renderer.centre.add(new Point(-100, 0));
+                break;
+            case key_right:
+                renderer.centre = renderer.centre.add(new Point(100, 0));
+                break; 
+            case key_up:
+                renderer.centre = renderer.centre.add(new Point(0, -100));
+                break;
+            case key_down:
+                renderer.centre = renderer.centre.add(new Point(0, 100));
+                break;
+            case 0:
+                if (event.key == '+') renderer.scale *= 1.1;
+                if (event.key == '=') renderer.scale *= 1.1;
+                if (event.key == '-') renderer.scale *= 1/1.1;
+                if (event.key == 'd') console.log(renderer);
+                break;
+        }
+    }
+    document.addEventListener('keypress', on_keypress);
+}
+
+function attach_controller(vehicle) {
     function on_keypress(event) {
         switch (event.keyCode) {
             case key_left:
@@ -291,6 +356,17 @@ function attach_controller(vehicle) {
     document.addEventListener('keypress', on_keypress);
 }
 
+function attach_debug_controls(simulate_fn) {
+    function on_keypress(event) {
+        switch (event.keyCode) {
+            case 0:
+                if (event.key == 's') simulate_fn();
+                break;
+        }
+    }
+    document.addEventListener('keypress', on_keypress);
+}
+
 /**
  * Currently just a storage place for stuff in the world.
  */
@@ -304,44 +380,107 @@ class World {
     }
 }
 
-function render_view(ctx, world, centre, scale) {
-    const renderer = new Renderer(ctx, centre, scale);
-
+function render_view(renderer, world) {
     for (const v of world.vehicles) {
-        render_vehicle(renderer, v, centre, scale);
+        render_vehicle(renderer, v);
     } 
+}
+
+function render_path_segment(renderer, segment) {
+    renderer.stroke_polygon(guideline_brush, new Polygon([
+        segment.start,
+        segment.end
+    ])) 
+
+    renderer.stroke_arc(guideline_brush, segment.end, 10);
+}
+
+class PathSegment {
+    constructor(start, end) {
+        this.start = start;
+        this.end = end;
+    }
+}
+
+function render_fn(renderer, fn, options={}) {
+    const start = options.start;
+    const end = options.end;
+    const step = options.step || 1;
+    const offset = options.offset || new Point(0,0);
+    const scale_x = options.scale_x || 1;
+    const scale_y = options.scale_y || 100;
+
+    const points = [];
+
+    for (let x = start; x < end; x += step) {
+        const p = new Point(scale_x * x, -scale_y * fn(x));
+        points.push(p.add(offset));
+    }
+    renderer.stroke_path(black_brush, points);
+    renderer.stroke_path(guideline_brush, 
+        [new Point(start, 0), new Point(end, 0)]
+        .map(p => p.add(offset))
+    );
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('landscape');
     const ctx = canvas.getContext('2d');
 
-    const render_interval = 1000/50;
-    const simulation_interval = 20;
+    const render_interval = 100 //50;
+    const simulation_interval = 100;
 
-    const bike = make_bike(100, 400);
-    bike.speed = 5;
+//    const bike = make_bike(100, 400);
+//    bike.speed = 5;
 
-    const car = make_car(600, 400);
-    car.turn(-100);
-    car.turn(0.3);
-    car.speed = 4;
+    const car = make_car(700, 700);
+//    attach_controller(car);
+//    car.turn(-100);
+//    car.turn_to(Math.PI/2);
+    car.angle = 0;//Math.PI/2;
+    car.turn_to(0);
+    car.speed = 5;
 
-    attach_controller(bike);
+    const renderer = new Renderer(ctx, new Point(-300, 0), 0.578);
+    attach_view_controller(renderer);
 
     const world = new World();
-    world.add_vehicle(bike);
+    const segment = new PathSegment(new Point(500, 900), new Point(500, 300));
     world.add_vehicle(car);
     
-
     setInterval(() => {
         ctx.clearRect(0,0,canvas.width, canvas.height);
-        render_view(ctx, world, new Point(-100, 200), 0.8);
+        render_view(renderer, world);
+        render_path_segment(renderer, segment);
+
+        //render_fn(renderer, get_desired_absolute_wheel_angle, {
+        //    start: -600, end: 600, step: 50, offset: new Point(500, 300),
+        //});
+        //render_fn(renderer, Math.sin, {
+        //    start: -30,
+        //    end: 30,
+        //    step: 0.1, 
+        //    offset: new Point(500, 300),
+        //    scale_x: 10,
+        //});;
+        //render_fn(renderer, normalise_angle, {
+        //    start: -30,
+        //    end: 30,
+        //    step: 0.1, 
+        //    offset: new Point(500, 300),
+        //    scale_x: 10,
+        //    scale_y: 50,
+        //});;
     }, render_interval);
 
-    setInterval(() => {
-        move(bike);
-        move(car);
+    function simulate_tick() {
+        move_towards_segment(car, segment);
+    }
+
+    attach_debug_controls(simulate_tick);
+    setTimeout(() => {
+    //setInterval(() => {
+//        move(car);
     }, simulation_interval);
 
 //    setTimeout(() => { location.reload(true)}, 1000);
