@@ -14,6 +14,17 @@ export default class Renderer {
         this.scale = scale;
     }
 
+    fill_polygon(brush, poly) {
+        poly = poly
+            .trans(this.centre.negate())
+            .scalar_mult(this.scale);
+
+        this._with_brush(brush, () => {
+            trace_poly(this.ctx, poly);
+            this.ctx.fill();
+        });
+    }
+
     stroke_polygon(brush, poly) {
         poly = poly
             .trans(this.centre.negate())

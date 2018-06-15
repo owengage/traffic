@@ -107,7 +107,7 @@ function render_wheels(renderer, vehicle) {
 
     // Draw.
     for (const wheel of wheel_polys) {
-        renderer.stroke_polygon(black_brush, wheel);
+        renderer.fill_polygon(tyre_fill_brush, wheel);
     }
 }
 
@@ -117,7 +117,7 @@ function render_body(renderer, vehicle) {
     const poly = make_rectangle(centre, body.width, body.length);
     const rotated = poly.rot(vehicle.angle, centre);
 
-    renderer.stroke_polygon(black_brush, rotated);
+    renderer.fill_polygon(body_fill_brush, rotated);
 }
 
 function calc_line_eq(p1, p2) {
@@ -188,6 +188,18 @@ const guideline_brush = {
     }
 };
 
+const body_fill_brush = {
+    activate(ctx) {
+        ctx.fillStyle = '#369';
+    }
+};
+
+const tyre_fill_brush = {
+    activate(ctx) {
+        ctx.fillStyle = '#000';
+    }
+};
+
 function render_turning(renderer, vehicle) {
     const centre = vehicle.centre;
     const { point: rotated_int, radius: turning_radius } = get_turning_circle(vehicle);
@@ -214,8 +226,8 @@ function render_turning(renderer, vehicle) {
 let should_draw_guidelines = true;
 
 function render_vehicle(renderer, vehicle) {
-    render_wheels(renderer, vehicle);
     render_body(renderer, vehicle);
+    render_wheels(renderer, vehicle);
 
     if (should_draw_guidelines) {
         render_turning(renderer, vehicle);
@@ -324,7 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setInterval(() => {
         ctx.clearRect(0,0,canvas.width, canvas.height);
-        render_view(ctx, world, new Point(-100, 200), 0.3);
+        render_view(ctx, world, new Point(-100, 200), 0.8);
     }, render_interval);
 
     setInterval(() => {
