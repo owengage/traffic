@@ -1,3 +1,5 @@
+import Point from './point';
+
 export default class Polygon {
     constructor(points) {
         this.points = points;
@@ -16,3 +18,19 @@ export default class Polygon {
     }
 }
 
+/**
+ * Make rectangle at angle '0', so lying on its side.
+ */
+export function make_rectangle(centre, width, length) {
+    const top = centre.y + width / 2; 
+    const bottom = centre.y - width / 2;
+    const left = centre.x + length / 2;
+    const right = centre.x - length / 2; 
+
+    return new Polygon([
+        new Point(left, top),
+        new Point(right, top),
+        new Point(right, bottom),
+        new Point(left, bottom),
+    ]);
+}

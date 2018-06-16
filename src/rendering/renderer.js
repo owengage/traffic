@@ -1,4 +1,4 @@
-import Point from './point';
+import Point from 'traffic/point';
 
 function trace_poly(ctx, poly) {
     ctx.beginPath();

@@ -7,5 +7,10 @@ module.exports = {
         path: path.resolve(__dirname, 'dist')
     },
     mode: 'development',
-    devtool: 'source-map'
+    devtool: 'source-map',
+    resolve: {
+        alias: {
+            traffic: path.resolve(__dirname, './src'),
+        },
+    },
 };

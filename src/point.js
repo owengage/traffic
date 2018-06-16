@@ -29,4 +29,9 @@ export default class Point {
     negate() {
         return new Point(-this.x, -this.y);
     }
+
+    distance_to(p) {
+        const d = this.sub(p);
+        return Math.sqrt(d.x * d.x + d.y * d.y);
+    }
 }
