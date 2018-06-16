@@ -1,3 +1,5 @@
+import Point from './point';
+
 function trace_poly(ctx, poly) {
     ctx.beginPath();
     ctx.moveTo(poly.points[0].x, poly.points[0].y);
@@ -54,10 +56,26 @@ export default class Renderer {
             this.ctx.moveTo(points[0].x, points[0].y);
             this.ctx.beginPath();
             for (let p of points) {
-                p = p.add(this.centre.negate()).scalar_mult(this.scale);
+                p = p.sub(this.centre).scalar_mult(this.scale);
                 this.ctx.lineTo(p.x, p.y);
             }
             this.ctx.stroke();
+        });
+    }
+
+    label(point, text) {
+        point = point
+            .sub(this.centre)
+            .scalar_mult(this.scale)
+            .add(new Point(10,10));
+
+        const brush = {
+            activate(ctx) {
+                ctx.font = "15px Arial";
+            }
+        };
+        this._with_brush(brush, () => {
+            this.ctx.fillText(text, point.x, point.y);
         });
     }
 

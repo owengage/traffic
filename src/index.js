@@ -50,6 +50,7 @@ function make_car(x, y) {
     const length = 150;
     const width = 70;
     const turn_limit = 1;
+    const wheel_opts = { width: 10, length: 30, angle: 0 };
 
     return {
         turn(angle) {
@@ -58,7 +59,7 @@ function make_car(x, y) {
             this.wheels[3].angle = new_angle; 
         },
         turn_to(angle) {
-            angle = normalise_angle(angle);
+            angle = clamp(normalise_angle(angle), -turn_limit, turn_limit);
             this.wheels[0].angle = angle;
             this.wheels[3].angle = angle; 
         },
@@ -70,19 +71,23 @@ function make_car(x, y) {
         centre: new Point(x, y),
         body: { length, width },
         wheels: [ 
-            make_wheel(28, -length/2 + 17, { width: 10, length: 30, angle: 0.5 }), 
-            make_wheel(28, length/2 - 17, { width: 10, length: 30 }),
-            make_wheel(-28, length/2 - 17, { width: 10, length: 30 }),
-            make_wheel(-28, -length/2 + 17, { width: 10, length: 30, angle: 0.5 }), 
+            make_wheel(length/2 - 17, 28, {...wheel_opts}), // front right
+            make_wheel(-length/2 + 17, 28,{...wheel_opts}), // back right
+            make_wheel(-length/2 + 17, -28, {...wheel_opts}), // back left
+            make_wheel(length/2 - 17, -28, {...wheel_opts}),  // front left
         ],
     }
 }
 
-function make_rectangle(centre, width, length, angle) {
-    const top = centre.y - length / 2; 
-    const left = centre.x - width / 2;
-    const bottom = centre.y + length / 2;
-    const right = centre.x + width / 2; 
+
+/**
+ * Make rectangle at angle '0', so lying on its side.
+ */
+function make_rectangle(centre, width, length) {
+    const top = centre.y + width / 2; 
+    const bottom = centre.y - width / 2;
+    const left = centre.x + length / 2;
+    const right = centre.x - length / 2; 
 
     return new Polygon([
         new Point(left, top),
@@ -134,7 +139,7 @@ function calc_line_eq(p1, p2) {
 }
 
 function eq_from_angle_and_point(angle, point) {
-    const gradient = 1/Math.tan(angle);
+    const gradient = Math.tan(angle);
     return {
         gradient,
         constant: point.y - gradient * point.x,
@@ -154,14 +159,14 @@ function distance_between_points(p1, p2) {
 }
 
 function get_turning_circle(vehicle) {
-    const max_turning_radius = 1e6;
+    const max_turning_radius = 1e5;
     const centre = vehicle.centre;
     const eqs = vehicle.wheels.map(wheel => {
         const abs_centre = {
             x: centre.x + wheel.centre.x,
             y: centre.y + wheel.centre.y
         };
-        const line_angle = Math.PI/2 - wheel.angle;
+        const line_angle = wheel.angle + Math.PI/2;
         return eq_from_angle_and_point(line_angle, abs_centre); 
     });
 
@@ -255,9 +260,6 @@ function move(vehicle) {
     let angle_delta = distance / radius;
     angle_delta = clockwise ? angle_delta : -angle_delta;
  
-    console.debug('a', angle_delta);
-    console.debug('v', vehicle.angle + angle_delta);
-    console.debug('norm', normalise_angle(vehicle.angle + angle_delta));
     if (!point) {
         vehicle.centre = vehicle.centre.add(new Point(
             distance * Math.sin(vehicle.angle),
@@ -269,21 +271,23 @@ function move(vehicle) {
     vehicle.angle = normalise_angle(vehicle.angle + angle_delta);
 }
 
+// checked for new compass.
 function get_desired_absolute_wheel_angle(distance) {
     const distance_for_perpendicular_wheel = 400;
     const half_pi = Math.PI / 2;
 
     if (distance > distance_for_perpendicular_wheel) {
-        return +half_pi;
+        return -half_pi;
     }
 
     if (-distance > distance_for_perpendicular_wheel) {
-        return -half_pi;
+        return +half_pi;
     }
-    return half_pi * Math.sin(half_pi * distance / distance_for_perpendicular_wheel);
+    return half_pi * -Math.sin(half_pi * distance / distance_for_perpendicular_wheel);
 }
 
 function move_towards_segment(vehicle, segment) {
+    // checked for new compass.
     function get_distance_from_segment(vehicle, segment) {
         const { x: x0, y: y0 } = vehicle.centre;
         const { x: x1, y: y1 } = segment.start;
@@ -291,12 +295,20 @@ function move_towards_segment(vehicle, segment) {
      
         const numerator = (y2 - y1)*x0 - (x2 - x1)*y0 + x2*y1 - y2*x1;
         const denominator = distance_between_points(segment.start, segment.end);
-        return numerator/denominator;
+        return -numerator/denominator;
+    }
+
+    // checked for new compass.
+    function get_segment_angle(segment) {
+        const delta = segment.end.sub(segment.start);
+        return Math.atan2(delta.y, delta.x);
     }
 
     const distance = get_distance_from_segment(vehicle, segment);
     const absolute_angle = get_desired_absolute_wheel_angle(distance);
-    vehicle.turn_to(absolute_angle - vehicle.angle);
+    const segment_angle = get_segment_angle(segment);
+
+    vehicle.turn_to(absolute_angle + segment_angle - vehicle.angle);
     move(vehicle);
 }
 
@@ -393,6 +405,8 @@ function render_path_segment(renderer, segment) {
     ])) 
 
     renderer.stroke_arc(guideline_brush, segment.end, 10);
+    renderer.label(segment.start, "start");
+    renderer.label(segment.end, "end");
 }
 
 class PathSegment {
@@ -423,29 +437,42 @@ function render_fn(renderer, fn, options={}) {
     );
 }
 
+function render_compass(renderer, point) {
+    const radius = 70;
+    const zero_point = point.add(new Point(radius, 0));
+
+    renderer.stroke_arc(guideline_brush, point, 10);
+    renderer.stroke_arc(guideline_brush, point, radius, -Math.PI/2, Math.PI/2);
+    renderer.stroke_path(guideline_brush, [point, zero_point]);
+    renderer.label(zero_point, "0");
+    renderer.label(zero_point.rot(Math.PI/2, point), "pi/2");
+    renderer.label(zero_point.rot(-Math.PI/2, point), "-pi/2");
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('landscape');
     const ctx = canvas.getContext('2d');
 
-    const render_interval = 100 //50;
-    const simulation_interval = 100;
+    const render_interval = 1000/50 //50;
+    const simulation_interval = render_interval;
 
 //    const bike = make_bike(100, 400);
 //    bike.speed = 5;
 
-    const car = make_car(700, 700);
-//    attach_controller(car);
-//    car.turn(-100);
-//    car.turn_to(Math.PI/2);
-    car.angle = 0;//Math.PI/2;
-    car.turn_to(0);
-    car.speed = 5;
+    //const car = make_car(Math.random() * 1000, Math.random() * 1000 + 500);
+    const car = make_car(500, 800);
+    //const car = make_car(100, 800);
+    car.angle = 2 * Math.PI * Math.random();//Math.PI/2;
+    car.angle = -Math.PI/2;
+    car.speed = 10;
+
+    console.debug(car);
 
     const renderer = new Renderer(ctx, new Point(-300, 0), 0.578);
     attach_view_controller(renderer);
 
     const world = new World();
-    const segment = new PathSegment(new Point(500, 900), new Point(500, 300));
+    const segment = new PathSegment(new Point(-200, 500), new Point(900, 0));
     world.add_vehicle(car);
     
     setInterval(() => {
@@ -453,35 +480,23 @@ document.addEventListener('DOMContentLoaded', () => {
         render_view(renderer, world);
         render_path_segment(renderer, segment);
 
+        render_compass(renderer, new Point(-200, 100));
+
         //render_fn(renderer, get_desired_absolute_wheel_angle, {
         //    start: -600, end: 600, step: 50, offset: new Point(500, 300),
         //});
-        //render_fn(renderer, Math.sin, {
-        //    start: -30,
-        //    end: 30,
-        //    step: 0.1, 
-        //    offset: new Point(500, 300),
-        //    scale_x: 10,
-        //});;
-        //render_fn(renderer, normalise_angle, {
-        //    start: -30,
-        //    end: 30,
-        //    step: 0.1, 
-        //    offset: new Point(500, 300),
-        //    scale_x: 10,
-        //    scale_y: 50,
-        //});;
     }, render_interval);
 
     function simulate_tick() {
+//        move(car);
         move_towards_segment(car, segment);
     }
 
     attach_debug_controls(simulate_tick);
-    setTimeout(() => {
-    //setInterval(() => {
-//        move(car);
+
+    setInterval(() => {
+//        simulate_tick();
     }, simulation_interval);
 
-//    setTimeout(() => { location.reload(true)}, 1000);
+    //setTimeout(() => { location.reload(true)}, 3000);
 });
