@@ -12,6 +12,35 @@ import { attach_view_controller, attach_debug_controls } from 'traffic/controlle
 
 import _ from 'lodash';
 
+function r(min, max) {
+    return Math.random() * (max-min) + min
+}
+
+function rp(min, max) {
+    return new Point(r(min, max), r(min,max));
+}
+
+function sin_loop() {
+    const points = [];
+
+    for (let th = 0; th < 2*Math.PI; th += 0.1) {
+        points.push(new Point(200*th, 400 + 200 * Math.sin(th)));
+    }
+
+    return points;
+}
+
+function segmentise(points) {
+    const segments = [];
+
+    for (let i = 0; i < points.length - 1; i++) {
+        segments.push(new RouteSegment(points[i], points[i+1]));
+    }
+    segments.push(new RouteSegment(points[points.length - 1], points[0]));
+
+    return segments;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('landscape');
     const ctx = canvas.getContext('2d');
@@ -19,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const render_interval = 1000/50;
     const simulation_interval = render_interval;
 
-    const car = new Car(new Point(Math.random() * 100, Math.random() * 1000 + 500));
+    const car = new Car(new Point(r(0,1000), r(0,1000)));
     car.angle = 2 * Math.PI * Math.random();
     car.speed = 10;
 
@@ -27,18 +56,26 @@ document.addEventListener('DOMContentLoaded', () => {
     attach_view_controller(renderer);
 
     const world = new World();
-    const segment = new RouteSegment(new Point(-200, 500), new Point(900, 0));
     world.add_vehicle(car);
-    
+
+    let current_segment_index = 0;
+    const segments = segmentise(sin_loop());
+
     setInterval(() => {
         ctx.clearRect(0,0,canvas.width, canvas.height);
         render_world(renderer, world);
-        render_route_segment(renderer, segment);
+        segments.forEach(s => render_route_segment(renderer, s));
         render_compass(renderer, new Point(-200, 100));
     }, render_interval);
 
+
     function simulate_tick() {
-        segment.apply_routing_to(car);
+        const current_segment = segments[current_segment_index];
+        if (current_segment.is_within_route(car)) {
+            current_segment.apply_routing_to(car);
+        } else {
+            current_segment_index = (current_segment_index + 1) % segments.length;
+        }
         car.tick();
     }
 

@@ -39,5 +39,5 @@ export function render_body(renderer, vehicle) {
 export function render_vehicle(renderer, vehicle) {
     render_body(renderer, vehicle);
     render_wheels(renderer, vehicle);
-    render_turning(renderer, vehicle);
+    //render_turning(renderer, vehicle);
 }
