@@ -263,7 +263,7 @@ function move(vehicle) {
     if (!point) {
         vehicle.centre = vehicle.centre.add(new Point(
             distance * Math.cos(vehicle.angle),
-            -distance * Math.sin(vehicle.angle)));
+            distance * Math.sin(vehicle.angle)));
         return;
     }
 
@@ -456,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const render_interval = 1000/50 //50;
     const simulation_interval = render_interval;
 
-    const car = make_car(Math.random() * 1000, Math.random() * 1000 + 500);
+    const car = make_car(Math.random() * 100, Math.random() * 1000 + 500);
     //const car = make_car(500, 800);
     //const car = make_car(100, 800);
     car.angle = 2 * Math.PI * Math.random();//Math.PI/2;
@@ -494,5 +494,5 @@ document.addEventListener('DOMContentLoaded', () => {
         simulate_tick();
     }, simulation_interval);
 
-    setTimeout(() => { location.reload(true)}, 3000);
+    setTimeout(() => { location.reload(true)}, 5000)
 });
