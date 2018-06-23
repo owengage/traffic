@@ -10,15 +10,67 @@ function trace_poly(ctx, poly) {
 }
 
 export default class Renderer {
-    constructor(ctx, centre, scale) {
-        this.ctx = ctx;
-        this.centre = centre; // TODO: not really centre. It's top-left.
+    constructor(canvas, centre, scale) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
         this.scale = scale;
+        this.centre = centre;
+    }
+
+    get scale() {
+        return this._scale;
+    }
+
+    set scale(value) {
+        this._scale = value;
+        this._world_width = this.canvas.width / value;
+        this._world_height = this.canvas.height / value;
+    }
+
+    get centre() {
+        return this._centre;
+    }
+
+    set centre(value) {
+        this._centre = value;
+        this._translation_vector = value
+            .negate()
+            .add(new Point(this._world_width/2, this._world_height/2));
+    }
+
+    view_bounds() {
+        const half_width = this._world_width / 2;
+        const half_height = this._world_height / 2;
+        return {
+            x: { min: this.centre.x - half_width, max: this.centre.x + half_width },
+            y: { min: this.centre.y - half_height, max: this.centre.y + half_height },
+        };
+    }
+
+    grid(brush, width) {
+        const view = this.view_bounds();
+        const start_x = width * Math.floor(view.x.min / width);
+        const end_x = width * Math.ceil(view.x.max / width);
+        for (let x = start_x; x <= end_x; x += width) {
+            this.stroke_path(brush, [
+                new Point(x, view.y.min),
+                new Point(x, view.y.max),
+            ]);
+        }
+
+        const start_y = width * Math.floor(view.y.min / width);
+        const end_y = width * Math.ceil(view.y.max / width);
+        for (let y = start_y; y <= end_y; y += width) {
+            this.stroke_path(brush, [
+                new Point(view.x.min, y),
+                new Point(view.x.max, y),
+            ]);
+        }
     }
 
     fill_polygon(brush, poly) {
         poly = poly
-            .trans(this.centre.negate())
+            .trans(this._translation_vector)
             .scalar_mult(this.scale);
 
         this._with_brush(brush, () => {
@@ -29,7 +81,7 @@ export default class Renderer {
 
     stroke_polygon(brush, poly) {
         poly = poly
-            .trans(this.centre.negate())
+            .trans(this._translation_vector)
             .scalar_mult(this.scale);
         
         this._with_brush(brush, () => {
@@ -40,7 +92,7 @@ export default class Renderer {
 
     stroke_arc(brush, centre, radius, start=0, end=2*Math.PI) {
         centre = centre
-            .add(this.centre.negate())
+            .add(this._translation_vector)
             .scalar_mult(this.scale);
         radius *= this.scale;
 
@@ -56,7 +108,7 @@ export default class Renderer {
             this.ctx.moveTo(points[0].x, points[0].y);
             this.ctx.beginPath();
             for (let p of points) {
-                p = p.sub(this.centre).scalar_mult(this.scale);
+                p = p.add(this._translation_vector).scalar_mult(this.scale);
                 this.ctx.lineTo(p.x, p.y);
             }
             this.ctx.stroke();
@@ -65,7 +117,7 @@ export default class Renderer {
 
     label(point, text) {
         point = point
-            .sub(this.centre)
+            .add(this._translation_vector)
             .scalar_mult(this.scale)
             .add(new Point(10,10));
 

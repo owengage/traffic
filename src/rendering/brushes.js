@@ -9,6 +9,12 @@ export const guideline = {
     }
 };
 
+export const line_colour = (colour) => ({
+    activate(ctx) {
+        ctx.strokeStyle = colour;
+    }
+});
+
 export const body_fill = {
     activate(ctx) {
         ctx.fillStyle = '#369';

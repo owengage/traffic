@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const car2 = new Car(new Point(r(0,1000), r(0,1000)));
     car2.speed = 10;
 
-    const renderer = new Renderer(ctx, new Point(-300, 0), 0.578);
+    const renderer = new Renderer(canvas, new Point(-300, 0), 0.578);
     attach_view_controller(renderer);
 
     const world = new World();
@@ -90,8 +90,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setInterval(() => {
         ctx.clearRect(0,0,canvas.width, canvas.height);
+        renderer.grid(brushes.line_colour('#eee'), 100);
         render_world(renderer, world);
-        route.segments.forEach(s => render_route_segment(renderer, s));
+        //route.segments.forEach(s => render_route_segment(renderer, s));
         render_compass(renderer, new Point(-200, 100));
     }, render_interval);
 
@@ -101,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
         token2 = route.apply_routing_to(car2, token2);
         car.tick();
         car2.tick();
-        renderer.centre = car.centre.sub(new Point(600, 400));
+        renderer.centre = car.centre;;
     }
 
     attach_debug_controls(simulate_tick);
