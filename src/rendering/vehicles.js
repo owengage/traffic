@@ -33,11 +33,17 @@ export function render_body(renderer, vehicle) {
     const poly = make_rectangle(centre, body.width, body.length);
     const rotated = poly.rot(vehicle.angle, centre);
 
-    renderer.fill_polygon(brushes.body_fill, rotated);
+    renderer.fill_polygon(brushes.body_fill_colour(vehicle.body.colour), rotated);
+}
+
+function render_routing_point(renderer, vehicle) {
+    const p = vehicle.routing_point;
+    renderer.stroke_arc(brushes.guideline, p, 10);
 }
 
 export function render_vehicle(renderer, vehicle) {
     render_body(renderer, vehicle);
     render_wheels(renderer, vehicle);
+    render_routing_point(renderer, vehicle);
     //render_turning(renderer, vehicle);
 }

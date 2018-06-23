@@ -15,6 +15,12 @@ export const body_fill = {
     }
 };
 
+export const body_fill_colour = (colour) => ({
+    activate(ctx) {
+        ctx.fillStyle = colour;
+    }
+});
+
 export const tyre_fill = {
     activate(ctx) {
         ctx.fillStyle = '#000';

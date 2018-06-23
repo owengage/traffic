@@ -23,7 +23,7 @@ function rp(min, max) {
 function sin_loop() {
     const points = [];
 
-    for (let th = 0; th < 2*Math.PI; th += 0.1) {
+    for (let th = 0; th < 6*Math.PI; th += 0.1) {
         points.push(new Point(200*th, 400 + 200 * Math.sin(th)));
     }
 
@@ -41,6 +41,27 @@ function segmentise(points) {
     return segments;
 }
 
+class Route {
+    constructor(points) {
+        this.segments = segmentise(points);
+        
+    }
+
+    apply_routing_to(vehicle, routing_token=0) {
+        let current_segment_index = routing_token;
+        let current_segment = this.segments[current_segment_index];
+        
+        // TODO: If route isn't complete loop, could infinite loop.
+        while (!current_segment.is_within_route(vehicle)) {
+            current_segment_index = (current_segment_index + 1) % this.segments.length;
+            current_segment = this.segments[current_segment_index];
+        } 
+
+        current_segment.apply_routing_to(vehicle);
+        return current_segment_index;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('landscape');
     const ctx = canvas.getContext('2d');
@@ -50,33 +71,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const car = new Car(new Point(r(0,1000), r(0,1000)));
     car.angle = 2 * Math.PI * Math.random();
+    car.body.colour = '#922';
     car.speed = 10;
+
+    const car2 = new Car(new Point(r(0,1000), r(0,1000)));
+    car2.speed = 10;
 
     const renderer = new Renderer(ctx, new Point(-300, 0), 0.578);
     attach_view_controller(renderer);
 
     const world = new World();
     world.add_vehicle(car);
+    world.add_vehicle(car2);
 
-    let current_segment_index = 0;
-    const segments = segmentise(sin_loop());
+    const route = new Route(sin_loop());
+    let token1 = 0;
+    let token2 = 0;
 
     setInterval(() => {
         ctx.clearRect(0,0,canvas.width, canvas.height);
         render_world(renderer, world);
-        segments.forEach(s => render_route_segment(renderer, s));
+        route.segments.forEach(s => render_route_segment(renderer, s));
         render_compass(renderer, new Point(-200, 100));
     }, render_interval);
 
 
     function simulate_tick() {
-        const current_segment = segments[current_segment_index];
-        if (current_segment.is_within_route(car)) {
-            current_segment.apply_routing_to(car);
-        } else {
-            current_segment_index = (current_segment_index + 1) % segments.length;
-        }
+        token1 = route.apply_routing_to(car, token1);
+        token2 = route.apply_routing_to(car2, token2);
         car.tick();
+        car2.tick();
+        renderer.centre = car.centre.sub(new Point(600, 400));
     }
 
     attach_debug_controls(simulate_tick);

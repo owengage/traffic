@@ -42,11 +42,13 @@ export default class Car {
         const length = 150;
         const width = 70;
 
+        this.angle = 0;
         this.speed = 0;
         this.centre = centre;
         this.turn_limit = 1;
         this.body = {
-            length, width
+            length, width,
+            colour: '#33e'
         };
         this.wheels = [
             new Wheel(new Point(length/2 - 17, 28), {...wheel_opts}), // front right
@@ -54,6 +56,12 @@ export default class Car {
             new Wheel(new Point(-length/2 + 17, -28), {...wheel_opts}), // back left
             new Wheel(new Point(length/2 - 17, -28), {...wheel_opts}),  // front left
         ];
+    }
+
+    get routing_point() {
+        return this.centre
+            .add(new Point(this.body.length/2, 0))
+            .rot(this.angle, this.centre);
     }
 
     turn(angle) {

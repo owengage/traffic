@@ -1,5 +1,5 @@
 function get_desired_absolute_wheel_angle(distance) {
-    const distance_for_perpendicular_wheel = 400;
+    const distance_for_perpendicular_wheel = 500;
     const half_pi = Math.PI / 2;
 
     if (distance > distance_for_perpendicular_wheel) {
@@ -14,7 +14,7 @@ function get_desired_absolute_wheel_angle(distance) {
 
 function aim_towards_segment(vehicle, segment) {
     function get_distance_from_segment(vehicle, segment) {
-        const { x: x0, y: y0 } = vehicle.centre;
+        const { x: x0, y: y0 } = vehicle.routing_point;
         const { x: x1, y: y1 } = segment.start;
         const { x: x2, y: y2 } = segment.end;
      
@@ -47,7 +47,7 @@ export default class RouteSegment {
 
     is_within_route(vehicle) {
         // rotate segment so it lines up with x axis
-        const centre = vehicle.centre;
+        const centre = vehicle.routing_point;
         const d = this.end.sub(this.start);
         const theta = Math.atan2(d.y, d.x);
         const start_x = this.start.rot(-theta, centre).x;
