@@ -3,9 +3,10 @@ import Renderer from 'traffic/rendering/renderer';
 import World from 'traffic/world';
 import Car from 'traffic/car';
 import RouteSegment from 'traffic/routing/route-segment';
+import { get_desired_car_wheel_angle } from 'traffic/routing/route-segment';
 
 import * as brushes from 'traffic/rendering/brushes'
-import { render_compass } from 'traffic/rendering/visual-aids';
+import { render_fn, render_compass } from 'traffic/rendering/visual-aids';
 import { render_world } from 'traffic/rendering/worlds';
 import { render_route_segment } from 'traffic/rendering/routes';
 import { attach_view_controller, attach_debug_controls } from 'traffic/controllers';
@@ -66,42 +67,39 @@ document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('landscape');
     const ctx = canvas.getContext('2d');
 
-    const render_interval = 1000/50;
-    const simulation_interval = render_interval;
+    const simulation_interval = 10;
 
-    const car = new Car(new Point(r(0,1000), r(0,1000)));
+    const car = new Car(rp(0,1000), {
+        body: { length: 150, colour: `rgb(${r(30,150)}, ${r(30,150)}, ${r(30,150)})` }
+    });
     car.angle = 2 * Math.PI * Math.random();
-    car.body.colour = '#922';
-    car.speed = 10;
+    car.speed = 15;
 
-    const car2 = new Car(new Point(r(0,1000), r(0,1000)));
-    car2.speed = 10;
-
-    const renderer = new Renderer(canvas, new Point(-300, 0), 0.578);
+    const renderer = new Renderer(canvas, new Point(-300, 0), 0.3);
     attach_view_controller(renderer);
 
     const world = new World();
     world.add_vehicle(car);
-    world.add_vehicle(car2);
 
     const route = new Route(sin_loop());
     let token1 = 0;
-    let token2 = 0;
 
-    setInterval(() => {
+    const render_frame = () => {
         ctx.clearRect(0,0,canvas.width, canvas.height);
         renderer.grid(brushes.line_colour('#eee'), 100);
         render_world(renderer, world);
-        //route.segments.forEach(s => render_route_segment(renderer, s));
+        route.segments.forEach(s => render_route_segment(renderer, s));
         render_compass(renderer, new Point(-200, 100));
-    }, render_interval);
+
+        window.requestAnimationFrame(render_frame);
+    }
+
+    window.requestAnimationFrame(render_frame);
 
 
     function simulate_tick() {
         token1 = route.apply_routing_to(car, token1);
-        token2 = route.apply_routing_to(car2, token2);
         car.tick();
-        car2.tick();
         renderer.centre = car.centre;;
     }
 
@@ -111,5 +109,4 @@ document.addEventListener('DOMContentLoaded', () => {
         simulate_tick();
     }, simulation_interval);
 
-//    setTimeout(() => { location.reload(true)}, 5000)
 });

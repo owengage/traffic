@@ -37,19 +37,20 @@ function calc_intersection_point(eq1, eq2) {
 }
 
 export default class Car {
-    constructor(centre) {
+    constructor(centre, options={}) {
+        const default_opts = {
+            body: { length: 150, width: 70, colour: '#33e' }, 
+        };
+        const opts = _.merge({}, default_opts, options);
         const wheel_opts = { width: 10, length: 30, angle: 0 };
-        const length = 150;
-        const width = 70;
+        const length = opts.body.length;
 
         this.angle = 0;
         this.speed = 0;
         this.centre = centre;
         this.turn_limit = 1;
-        this.body = {
-            length, width,
-            colour: '#33e'
-        };
+        this.body = opts.body;
+
         this.wheels = [
             new Wheel(new Point(length/2 - 17, 28), {...wheel_opts}), // front right
             new Wheel(new Point(-length/2 + 17, 28),{...wheel_opts}), // back right

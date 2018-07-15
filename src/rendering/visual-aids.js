@@ -1,6 +1,6 @@
 import Point from 'traffic/point';
 import Polygon from 'traffic/polygon';
-import { guideline } from './brushes';
+import { guideline, black } from './brushes';
 
 export function render_turning(renderer, vehicle) {
     const centre = vehicle.centre;
@@ -48,11 +48,13 @@ export function render_fn(renderer, fn, options={}) {
     const points = [];
 
     for (let x = start; x < end; x += step) {
-        const p = new Point(scale_x * x, -scale_y * fn(x));
+        const xx = scale_x * x;
+        const yy = -scale_y * fn(x);
+        const p = new Point(xx, yy);
         points.push(p.add(offset));
     }
-    renderer.stroke_path(brushes.black, points);
-    renderer.stroke_path(brushes.guideline, 
+    renderer.stroke_path(black, points);
+    renderer.stroke_path(guideline, 
         [new Point(start, 0), new Point(end, 0)]
         .map(p => p.add(offset))
     );
