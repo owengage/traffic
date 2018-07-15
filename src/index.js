@@ -2,7 +2,8 @@ import Point from 'traffic/point';
 import Renderer from 'traffic/rendering/renderer';
 import World from 'traffic/world';
 import Car from 'traffic/car';
-import RouteSegment from 'traffic/routing/route-segment';
+import Route from 'traffic/routing/route';
+import LoopedJourney from 'traffic/routing/looped-journey';
 import { get_desired_car_wheel_angle } from 'traffic/routing/route-segment';
 
 import * as brushes from 'traffic/rendering/brushes'
@@ -31,38 +32,6 @@ function sin_loop() {
     return points;
 }
 
-function segmentise(points) {
-    const segments = [];
-
-    for (let i = 0; i < points.length - 1; i++) {
-        segments.push(new RouteSegment(points[i], points[i+1]));
-    }
-    segments.push(new RouteSegment(points[points.length - 1], points[0]));
-
-    return segments;
-}
-
-class Route {
-    constructor(points) {
-        this.segments = segmentise(points);
-        
-    }
-
-    apply_routing_to(vehicle, routing_token=0) {
-        let current_segment_index = routing_token;
-        let current_segment = this.segments[current_segment_index];
-        
-        // TODO: If route isn't complete loop, could infinite loop.
-        while (!current_segment.is_within_route(vehicle)) {
-            current_segment_index = (current_segment_index + 1) % this.segments.length;
-            current_segment = this.segments[current_segment_index];
-        } 
-
-        current_segment.apply_routing_to(vehicle);
-        return current_segment_index;
-    }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('landscape');
     const ctx = canvas.getContext('2d');
@@ -73,16 +42,16 @@ document.addEventListener('DOMContentLoaded', () => {
         body: { length: 150, colour: `rgb(${r(30,150)}, ${r(30,150)}, ${r(30,150)})` }
     });
     car.angle = 2 * Math.PI * Math.random();
-    car.speed = 15;
+    car.speed = 5;
 
-    const renderer = new Renderer(canvas, new Point(-300, 0), 0.3);
+    const renderer = new Renderer(canvas, new Point(-300, 0), 0.57);
     attach_view_controller(renderer);
 
     const world = new World();
     world.add_vehicle(car);
 
     const route = new Route(sin_loop());
-    let token1 = 0;
+    const journey = new LoopedJourney(route, car);
 
     const render_frame = () => {
         ctx.clearRect(0,0,canvas.width, canvas.height);
@@ -96,9 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.requestAnimationFrame(render_frame);
 
-
     function simulate_tick() {
-        token1 = route.apply_routing_to(car, token1);
+        journey.aim();
         car.tick();
         renderer.centre = car.centre;;
     }
