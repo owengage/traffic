@@ -13,6 +13,7 @@ export default class Point {
     }
 
     rot(angle, centre) {
+        if (!centre) throw new Error('Must provide centre of rotation');
         const delta = this.sub(centre);
 
         const rotated_delta = new Point(

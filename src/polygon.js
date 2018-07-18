@@ -6,6 +6,7 @@ export default class Polygon {
     }
     
     rot(angle, centre) {
+        if (!centre) throw new Error('Must provide centre of rotation');
         return new Polygon(this.points.map(point => point.rot(angle, centre)));
     }
 
