@@ -13,9 +13,18 @@ export default class VehicleComponent extends Component {
 
         this.key = VEHICLE_KEY;
         this.routing_point = routing_point;                                                                                                                                                                                                                                                                                                                                                                        
-        this.turn_angle = 0;
+        this._turn_angle = 0;
         this.turn_point = turn_point;
         this.anchor_point = anchor_point;
-        this.speed = 5;
+        this.speed = 20;
+    }
+
+    get turn_angle() {
+        return this._turn_angle;
+    }
+
+    set turn_angle(value) {
+        const max_turn = 0.9;
+        this._turn_angle = _.clamp(value, -max_turn, max_turn);
     }
 }

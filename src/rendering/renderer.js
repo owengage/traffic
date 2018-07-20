@@ -68,6 +68,10 @@ export default class Renderer {
         }
     }
 
+    clear() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
     fill_polygon(brush, poly) {
         poly = poly
             .trans(this._translation_vector)
