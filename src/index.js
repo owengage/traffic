@@ -1,14 +1,9 @@
 import Point from 'traffic/point'
 import { make_rectangle } from 'traffic/polygon'
 import Renderer from 'traffic/rendering/renderer'
-import World from 'traffic/world'
-import Car from 'traffic/car'
 import Route from 'traffic/routing/route'
-import LoopedJourney from 'traffic/routing/looped-journey'
 
 import * as brushes from 'traffic/rendering/brushes'
-import { render_compass } from 'traffic/rendering/visual-aids'
-import { render_world } from 'traffic/rendering/worlds'
 import { render_route_segment } from 'traffic/rendering/routes'
 import { attach_view_controller, attach_debug_controls } from 'traffic/controllers'
 
@@ -92,16 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const simulation_interval = 1000/50;
 
-    const car = new Car(rp(0,1000), {
-        body: { length: 150, colour: `rgb(${r(30,150)}, ${r(30,150)}, ${r(30,150)})` }
-    });
-    car.angle = 2 * Math.PI * Math.random();
-    car.speed = 5;
-
     const renderer = new Renderer(canvas, new Point(-300, 0), 0.57);
 
-    // Entity framework stuff.
-    
     const entities = [];
     const render_system = new RenderSystem(renderer);
     const vehicle_system = new VehicleSystem();
@@ -116,22 +103,12 @@ document.addEventListener('DOMContentLoaded', () => {
     car_entity2.add_component(new LoopedJourneyComponent(sine_route));
     car_entity3.add_component(new LoopedJourneyComponent(sine_route));
 
-    // end entity stuff
-
     attach_view_controller(renderer);
-
-    const world = new World();
-    world.add_vehicle(car);
-
-    const route = new Route(sin_loop());
-    const journey = new LoopedJourney(route, car);
-
+   
     const render_frame = () => {
         ctx.clearRect(0,0,canvas.width, canvas.height);
         renderer.grid(brushes.line_colour('#eee'), 100);
-        render_world(renderer, world);
-        route.segments.forEach(s => render_route_segment(renderer, s));
-        render_compass(renderer, new Point(-200, 100));
+        sine_route.segments.forEach(s => render_route_segment(renderer, s));
 
         render_system.execute(entities);
 
@@ -143,12 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function simulate_tick() {
         vehicle_system.execute(entities);
         routing_system.execute(entities);
-        journey.aim();
-        car.tick();
-        //renderer.centre = car.centre;;
     }
-
-    attach_debug_controls(simulate_tick);
 
     setInterval(() => {
         simulate_tick();

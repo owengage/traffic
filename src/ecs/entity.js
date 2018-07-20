@@ -1,6 +1,8 @@
-import TRANSFORM_KEY from './transform-key';
+import TRANSFORM_KEY from './transform-key'
 import TransformComponent from './transform-component'
-import Point from '../point';
+import Point from '../point'
+
+import _ from 'lodash'
 
 export default class Entity {
     constructor() {
