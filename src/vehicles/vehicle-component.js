@@ -12,7 +12,6 @@ export default class VehicleComponent extends Component {
         }
 
         this.key = VEHICLE_KEY;
-        // TODO: Set routing point properly.
         this.routing_point = routing_point;                                                                                                                                                                                                                                                                                                                                                                        
         this.turn_angle = 0;
         this.turn_point = turn_point;
