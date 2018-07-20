@@ -1,32 +1,29 @@
-import Point from 'traffic/point';
-import { make_rectangle } from 'traffic/polygon';
-import Renderer from 'traffic/rendering/renderer';
-import World from 'traffic/world';
-import Car from 'traffic/car';
-import Route from 'traffic/routing/route';
-import LoopedJourney from 'traffic/routing/looped-journey';
-import { get_desired_car_wheel_angle } from 'traffic/routing/route-segment';
+import Point from 'traffic/point'
+import { make_rectangle } from 'traffic/polygon'
+import Renderer from 'traffic/rendering/renderer'
+import World from 'traffic/world'
+import Car from 'traffic/car'
+import Route from 'traffic/routing/route'
+import LoopedJourney from 'traffic/routing/looped-journey'
 
 import * as brushes from 'traffic/rendering/brushes'
-import { render_compass } from 'traffic/rendering/visual-aids';
-import { render_world } from 'traffic/rendering/worlds';
-import { render_route_segment } from 'traffic/rendering/routes';
-import { attach_view_controller, attach_debug_controls } from 'traffic/controllers';
+import { render_compass } from 'traffic/rendering/visual-aids'
+import { render_world } from 'traffic/rendering/worlds'
+import { render_route_segment } from 'traffic/rendering/routes'
+import { attach_view_controller, attach_debug_controls } from 'traffic/controllers'
 
-import System from './ecs/system';
-import Component from './ecs/component';
-import Entity from './ecs/entity';
-import TransformComponent from './ecs/transform-component';
-import TRANSFORM_KEY from './ecs/transform-key';
-import RenderSystem from './rendering/render-system';
-import BrushComponent from './rendering/brush-component';
-import PolygonComponent from './rendering/polygon-component';
+import Entity from './ecs/entity'
+import TransformComponent from './ecs/transform-component'
+import RenderSystem from './rendering/render-system'
+import BrushComponent from './rendering/brush-component'
+import PolygonComponent from './rendering/polygon-component'
 
-import VehicleSystem from './vehicles/vehicle-system';
-import WheelComponent, { WheelKind } from './vehicles/wheel-component';
-import VehicleComponent from './vehicles/vehicle-component';
+import VehicleSystem from './vehicles/vehicle-system'
+import WheelComponent, { WheelKind } from './vehicles/wheel-component'
+import VehicleComponent from './vehicles/vehicle-component'
 
-import _ from 'lodash';
+import RoutingSystem from './routing/routing-system'
+import LoopedJourneyComponent from './routing/looped-journey-component'
 
 function r(min, max) {
     return Math.random() * (max-min) + min
@@ -66,17 +63,18 @@ function make_tyre(entities, kind, car_entity, centre) {
     return tyre;
 }
 
-function make_car_entity(entities, centre) {
+function make_car_entity(entities, centre, colour='#e66') {
     const car_entity = new Entity();
     const turn_point = new Point(52, 26);
     const anchor_point = new Point(-52, 26);
-    const vehicle_comp = new VehicleComponent(turn_point, anchor_point);
+    const routing_point = new Point(52, 0);
+    const vehicle_comp = new VehicleComponent(turn_point, anchor_point, routing_point);
 
     vehicle_comp.turn_angle = 0.3;
 
     car_entity.add_component(new TransformComponent(centre, 0));
     car_entity.add_component(car_polygon);
-    car_entity.add_component(car_brush);
+    car_entity.add_component(new BrushComponent(brushes.body_fill_colour(colour)));
     car_entity.add_component(vehicle_comp);
     entities.push(car_entity);
 
@@ -107,10 +105,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const entities = [];
     const render_system = new RenderSystem(renderer);
     const vehicle_system = new VehicleSystem();
+    const routing_system = new RoutingSystem();
 
-    const car_entity1 = make_car_entity(entities, new Point(0,0));
-    const car_entity2 = make_car_entity(entities, new Point(0,100));
-    const car_entity3 = make_car_entity(entities, new Point(0,200));
+    const car_entity1 = make_car_entity(entities, new Point(0,-400), 'red');
+    const car_entity2 = make_car_entity(entities, new Point(0,0), 'green');
+    const car_entity3 = make_car_entity(entities, new Point(0,400), 'blue');
+
+    const sine_route = new Route(sin_loop());
+    car_entity1.add_component(new LoopedJourneyComponent(sine_route));
+    car_entity2.add_component(new LoopedJourneyComponent(sine_route));
+    car_entity3.add_component(new LoopedJourneyComponent(sine_route));
 
     // end entity stuff
 
@@ -138,6 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function simulate_tick() {
         vehicle_system.execute(entities);
+        routing_system.execute(entities);
         journey.aim();
         car.tick();
         //renderer.centre = car.centre;;

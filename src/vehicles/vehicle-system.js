@@ -67,15 +67,15 @@ export default class VehicleSystem extends System {
             let angle_delta = distance / radius;
             angle_delta = clockwise ? angle_delta : -angle_delta;
          
-            if (!point) {
-                trans.centre = trans.centre.add(new Point(
+            if (point) {
+                trans.centre = trans.centre.rot(angle_delta, point);
+                trans.rotation = normalise_angle(trans.rotation + angle_delta);
+            } else {
+                const delta = new Point(
                     distance * Math.cos(trans.rotation),
-                    distance * Math.sin(trans.rotation)));
-                return;
+                    distance * Math.sin(trans.rotation));
+                trans.centre = trans.centre.add(delta);
             }
-    
-            trans.centre = trans.centre.rot(angle_delta, point);
-            trans.rotation = normalise_angle(trans.rotation + angle_delta);
         }
     }
 
